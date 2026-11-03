@@ -63,6 +63,19 @@ class BookApiTest extends TestCase
             ->assertJsonValidationErrors(['author']);
     }
 
+    public function test_api_errors_are_json_even_without_an_accept_header(): void
+    {
+        $this->get('/api/books/999')
+            ->assertNotFound()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertJsonStructure(['message']);
+
+        $this->post('/api/books', [])
+            ->assertUnprocessable()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertJsonValidationErrors(['title', 'author']);
+    }
+
     public function test_update_requires_at_least_one_book_field(): void
     {
         $book = Book::create(['title' => 'Learning Laravel', 'author' => 'John Smith']);
