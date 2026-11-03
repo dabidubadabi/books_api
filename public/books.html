@@ -14,9 +14,13 @@
         label { display: grid; gap: .35rem; flex: 1 1 220px; font-size: .9rem; font-weight: 600; }
         input { border: 1px solid #c8d1df; border-radius: 7px; padding: .65rem .75rem; font: inherit; }
         button { border: 0; border-radius: 7px; padding: .65rem .85rem; background: #2457d6; color: white; font: inherit; cursor: pointer; }
+        button.primary { background: #2457d6; }
         button.secondary { background: #536179; }
         button.danger { background: #b42335; }
-        button + button { margin-left: .35rem; }
+        button:hover { filter: brightness(1.1); }
+        .actions { display: flex; gap: .4rem; white-space: nowrap; }
+        .actions button { padding: .4rem .75rem; font-size: .85rem; min-width: 6.5rem; }
+        td input { width: 100%; min-width: 12rem; padding: .4rem .6rem; font-size: .92rem; box-sizing: border-box; }
         #status { min-height: 1.5rem; }
         #status.error { color: #b42335; }
         .table-wrap { overflow-x: auto; }
@@ -101,60 +105,94 @@
             return value ? new Date(value).toLocaleString() : '';
         }
 
+        function makeButton(label, className, onClick) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = className;
+            button.textContent = label;
+            button.addEventListener('click', onClick);
+            return button;
+        }
+
         function renderBook(book) {
             const row = document.createElement('tr');
-            row.append(cell(book.id), cell(book.title), cell(book.author));
+            const titleCell = cell(book.title);
+            row.append(cell(book.id), titleCell, cell(book.author));
             row.append(cell(formatDate(book.created_at)), cell(formatDate(book.updated_at)));
 
-            const actions = document.createElement('td');
+            const actions = document.createElement('div');
             actions.className = 'actions';
+            const actionsCell = document.createElement('td');
+            actionsCell.append(actions);
 
-            const editButton = document.createElement('button');
-            editButton.type = 'button';
-            editButton.className = 'secondary';
-            editButton.textContent = 'Edit title';
-            editButton.addEventListener('click', async () => {
-                const title = window.prompt('Enter the new title:', book.title);
-                if (title === null || title === book.title) return;
+            const showDefaultActions = () => {
+                titleCell.textContent = book.title;
+                actions.replaceChildren(
+                    makeButton('Edit title', 'secondary', showEditActions),
+                    makeButton('Delete', 'danger', showDeleteConfirmation),
+                );
+            };
 
-                try {
-                    await request(`/api/books/${book.id}`, {
-                        method: 'PUT',
-                        body: JSON.stringify({ title }),
-                    });
-                    setStatus('Book updated.');
-                    await loadBooks();
-                } catch (error) {
-                    setStatus(error.message, true);
-                }
-            });
+            const showEditActions = () => {
+                const input = document.createElement('input');
+                input.value = book.title;
+                input.maxLength = 255;
+                input.setAttribute('aria-label', 'New title');
+                titleCell.replaceChildren(input);
+                input.focus();
 
-            const deleteButton = document.createElement('button');
-            deleteButton.type = 'button';
-            deleteButton.className = 'danger';
-            deleteButton.textContent = 'Delete';
-            deleteButton.addEventListener('click', async () => {
-                if (!window.confirm(`Delete "${book.title}"?`)) return;
+                const save = async () => {
+                    const title = input.value.trim();
+                    if (title === '' || title === book.title) {
+                        showDefaultActions();
+                        return;
+                    }
 
-                try {
-                    await request(`/api/books/${book.id}`, { method: 'DELETE' });
-                    setStatus('Book deleted.');
-                    await loadBooks();
-                } catch (error) {
-                    setStatus(error.message, true);
-                }
-            });
+                    try {
+                        await request(`/api/books/${book.id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ title }),
+                        });
+                        await loadBooks('Book updated.');
+                    } catch (error) {
+                        setStatus(error.message, true);
+                    }
+                };
 
-            actions.append(editButton, deleteButton);
-            row.append(actions);
+                input.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') save();
+                    if (event.key === 'Escape') showDefaultActions();
+                });
+                actions.replaceChildren(
+                    makeButton('Save', 'primary', save),
+                    makeButton('Cancel', 'secondary', showDefaultActions),
+                );
+            };
+
+            const showDeleteConfirmation = () => {
+                actions.replaceChildren(
+                    makeButton('Confirm delete', 'danger', async () => {
+                        try {
+                            await request(`/api/books/${book.id}`, { method: 'DELETE' });
+                            await loadBooks('Book deleted.');
+                        } catch (error) {
+                            setStatus(error.message, true);
+                        }
+                    }),
+                    makeButton('Cancel', 'secondary', showDefaultActions),
+                );
+            };
+
+            showDefaultActions();
+            row.append(actionsCell);
             return row;
         }
 
-        async function loadBooks() {
+        async function loadBooks(successMessage = null) {
             try {
                 const books = await request('/api/books');
                 booksElement.replaceChildren(...books.map(renderBook));
-                setStatus(books.length ? `${books.length} book(s) loaded.` : 'No books yet. Add one above.');
+                setStatus(successMessage ?? (books.length ? `${books.length} book(s) loaded.` : 'No books yet. Add one above.'));
             } catch (error) {
                 setStatus(error.message, true);
             }
@@ -173,8 +211,7 @@
                     }),
                 });
                 form.reset();
-                setStatus('Book added.');
-                await loadBooks();
+                await loadBooks('Book added.');
             } catch (error) {
                 setStatus(error.message, true);
             }
