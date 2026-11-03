@@ -50,6 +50,8 @@ php artisan test
 
 ## Screenshots
 
+To retake them in Postman, import [postman/books_api.postman_collection.json](postman/books_api.postman_collection.json) (Import → select the file), start the server with `php artisan serve`, and send the requests in order.
+
 Requests and responses (`Accept: application/json`) are in [screenshots/](screenshots):
 
 | Step | Screenshot |
