@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Book;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -25,12 +24,6 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        foreach ([
-            ['title' => 'Learning Laravel', 'author' => 'John Smith'],
-            ['title' => 'Clean Code', 'author' => 'Robert C. Martin'],
-            ['title' => 'The Pragmatic Programmer', 'author' => 'David Thomas and Andrew Hunt'],
-        ] as $book) {
-            Book::firstOrCreate($book);
-        }
+        $this->call(BookSeeder::class);
     }
 }
