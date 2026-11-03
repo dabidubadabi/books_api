@@ -48,6 +48,20 @@ With the server running, open `http://127.0.0.1:8000/books.html` to list, add an
 php artisan test
 ```
 
+## Screenshots
+
+Requests and responses (`Accept: application/json`) are in [screenshots/](screenshots):
+
+| Step | Screenshot |
+|------|------------|
+| POST three books | `01-post-book-1.png`, `02-post-book-2.png`, `03-post-book-3.png` |
+| GET all books | `04-get-all-books.png` |
+| GET one book | `05-get-one-book.png` |
+| PUT (update title) | `06-put-update-book.png` |
+| DELETE | `07-delete-book.png` |
+| GET a missing book (404) | `08-get-missing-book.png` |
+| GET `/api/hello` | `09-get-hello.png` |
+
 ## Answers
 
 1. **`routes/web.php` vs `routes/api.php`:** `web.php` serves browser pages and uses the `web` middleware group (sessions, cookies, CSRF protection). `api.php` is for stateless API endpoints, is prefixed with `/api`, and returns JSON without sessions or CSRF.
