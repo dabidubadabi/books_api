@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Books API</title>
+    <style>
+        :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+        body { max-width: 1000px; margin: 0 auto; padding: 2rem 1rem; }
+        h1 { margin-bottom: .35rem; }
+        p { color: #536179; }
+        .card { background: white; border: 1px solid #dfe5ef; border-radius: 12px; padding: 1.25rem; margin: 1.25rem 0; box-shadow: 0 4px 18px #1720330b; }
+        form { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+        label { display: grid; gap: .35rem; flex: 1 1 220px; font-size: .9rem; font-weight: 600; }
+        input { border: 1px solid #c8d1df; border-radius: 7px; padding: .65rem .75rem; font: inherit; }
+        button { border: 0; border-radius: 7px; padding: .65rem .85rem; background: #2457d6; color: white; font: inherit; cursor: pointer; }
+        button.secondary { background: #536179; }
+        button.danger { background: #b42335; }
+        button + button { margin-left: .35rem; }
+        #status { min-height: 1.5rem; }
+        #status.error { color: #b42335; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: .75rem .6rem; border-bottom: 1px solid #e6eaf0; vertical-align: middle; }
+        th { color: #536179; font-size: .82rem; }
+        td { font-size: .92rem; }
+        @media (max-width: 600px) { body { padding: 1rem .65rem; } .actions { min-width: 150px; } }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Books API</h1>
+        <p>Manage books using the Laravel JSON API.</p>
+    </header>
+
+    <section class="card" aria-labelledby="add-heading">
+        <h2 id="add-heading">Add a book</h2>
+        <form id="book-form">
+            <label>Title <input name="title" maxlength="255" required></label>
+            <label>Author <input name="author" maxlength="255" required></label>
+            <button type="submit">Add book</button>
+        </form>
+    </section>
+
+    <section class="card" aria-labelledby="list-heading">
+        <h2 id="list-heading">Books</h2>
+        <p id="status" role="status" aria-live="polite">Loading books…</p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Title</th>
+                        <th scope="col">Author</th>
+                        <th scope="col">Created</th>
+                        <th scope="col">Updated</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="books"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <script>
+        const booksElement = document.querySelector('#books');
+        const form = document.querySelector('#book-form');
+        const statusElement = document.querySelector('#status');
+
+        function setStatus(message, isError = false) {
+            statusElement.textContent = message;
+            statusElement.classList.toggle('error', isError);
+        }
+
+        async function request(url, options = {}) {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    Accept: 'application/json',
+                    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+                    ...options.headers,
+                },
+            });
+            const result = response.status === 204 ? null : await response.json();
+
+            if (!response.ok) {
+                const errors = result?.errors ? Object.values(result.errors).flat().join(' ') : '';
+                throw new Error(errors || result?.message || `Request failed (${response.status}).`);
+            }
+
+            return result;
+        }
+
+        function cell(value) {
+            const element = document.createElement('td');
+            element.textContent = value ?? '';
+            return element;
+        }
+
+        function formatDate(value) {
+            return value ? new Date(value).toLocaleString() : '';
+        }
+
+        function renderBook(book) {
+            const row = document.createElement('tr');
+            row.append(cell(book.id), cell(book.title), cell(book.author));
+            row.append(cell(formatDate(book.created_at)), cell(formatDate(book.updated_at)));
+
+            const actions = document.createElement('td');
+            actions.className = 'actions';
+
+            const editButton = document.createElement('button');
+            editButton.type = 'button';
+            editButton.className = 'secondary';
+            editButton.textContent = 'Edit title';
+            editButton.addEventListener('click', async () => {
+                const title = window.prompt('Enter the new title:', book.title);
+                if (title === null || title === book.title) return;
+
+                try {
+                    await request(`/api/books/${book.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ title }),
+                    });
+                    setStatus('Book updated.');
+                    await loadBooks();
+                } catch (error) {
+                    setStatus(error.message, true);
+                }
+            });
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'danger';
+            deleteButton.textContent = 'Delete';
+            deleteButton.addEventListener('click', async () => {
+                if (!window.confirm(`Delete "${book.title}"?`)) return;
+
+                try {
+                    await request(`/api/books/${book.id}`, { method: 'DELETE' });
+                    setStatus('Book deleted.');
+                    await loadBooks();
+                } catch (error) {
+                    setStatus(error.message, true);
+                }
+            });
+
+            actions.append(editButton, deleteButton);
+            row.append(actions);
+            return row;
+        }
+
+        async function loadBooks() {
+            try {
+                const books = await request('/api/books');
+                booksElement.replaceChildren(...books.map(renderBook));
+                setStatus(books.length ? `${books.length} book(s) loaded.` : 'No books yet. Add one above.');
+            } catch (error) {
+                setStatus(error.message, true);
+            }
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(form);
+
+            try {
+                await request('/api/books', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: formData.get('title'),
+                        author: formData.get('author'),
+                    }),
+                });
+                form.reset();
+                setStatus('Book added.');
+                await loadBooks();
+            } catch (error) {
+                setStatus(error.message, true);
+            }
+        });
+
+        loadBooks();
+    </script>
+</body>
+</html>
